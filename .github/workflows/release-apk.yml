@@ -1,0 +1,73 @@
+name: Build Release APK
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: ☕ Setup Java JDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'gradle'
+    
+    - name: 📦 Install dependencies
+      run: npm ci
+    
+    - name: 🔑 Make gradlew executable
+      run: chmod +x android/gradlew
+    
+    - name: 🧹 Clean build
+      run: cd android && ./gradlew clean
+    
+    - name: 🔨 Build Release APK (unsigned)
+      run: cd android && ./gradlew assembleRelease
+    
+    - name: 📋 Prepare APK
+      run: |
+        mkdir -p release
+        VERSION="${{ github.event.inputs.version || '1.0.0' }}"
+        cp android/app/build/outputs/apk/release/app-release-unsigned.apk release/mediscript-mobile-v${VERSION}.apk
+    
+    - name: 📊 APK Information
+      run: |
+        VERSION="${{ github.event.inputs.version || '1.0.0' }}"
+        echo "📱 APK Details:"
+        ls -lh release/mediscript-mobile-v${VERSION}.apk
+        echo ""
+        echo "✅ Release APK ready!"
+        echo "📥 Version: ${VERSION}"
+    
+    - name: 📤 Upload Release APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: mediscript-mobile-release
+        path: release/*.apk
+        retention-days: 90
+    
+    - name: 🎉 Success Message
+      run: |
+        echo "✅ Release APK built successfully!"
+        echo "📥 Download from: Actions → Build Release APK → Artifacts"
+        echo "⚠️  Note: This is an unsigned APK for testing"
+        echo "📝 For Play Store, you need to sign the APK"
